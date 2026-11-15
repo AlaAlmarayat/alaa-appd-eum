@@ -1,0 +1,32 @@
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Android build outputs & caches
+platforms/android/app/build/
+platforms/android/.gradle/
+platforms/android/build/
+platforms/android/local.properties
+platforms/android/.idea/
+*.apk
+*.aab
+
+# iOS build outputs & caches
+platforms/ios/build/
+platforms/ios/DerivedData/
+platforms/ios/*.xcworkspace/xcuserdata/
+platforms/ios/*.xcodeproj/xcuserdata/
+platforms/ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+*.ipa
+
+# Temporary debugger responses
+response_body.txt
+response_headers.txt

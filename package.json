@@ -1,0 +1,44 @@
+{
+  "name": "alaa-appd-eum",
+  "displayName": "Ala'a AppD EUM",
+  "version": "1.0.0",
+  "description": "AppDynamics EUM Dual-Instrumentation Debugger & Session Replay Lab by Ala'a Mrayat",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ecosystem:cordova",
+    "appdynamics",
+    "eum",
+    "session-replay",
+    "rum",
+    "apm",
+    "mobile-rum",
+    "browser-rum"
+  ],
+  "author": "Ala'a Mrayat",
+  "license": "MIT",
+  "devDependencies": {
+    "appd-plugin-eum-mobile": "^25.4.1",
+    "cordova-android": "^15.1.0",
+    "cordova-ios": "^8.2.0"
+  },
+  "cordova": {
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "plugins": {
+      "appd-plugin-eum-mobile": {
+        "APP_KEY": "XXX-XXX-XXX",
+        "COLLECTOR_URL": "https://example-mobile-collector.com",
+        "LOGGING_LEVEL": "1",
+        "SCREENSHOTS_ENABLED": "false",
+        "SCREENSHOT_URL": "https://example-screenshots.com",
+        "REACHABILITY_HOST": "www.google.com",
+        "INTERACTION_CAPTURE_MODE": "0"
+      }
+    }
+  }
+}

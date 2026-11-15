@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="adeum_app_key">XXX-XXX-XXX</string>
+    <string name="adeum_collector_url">https://example-mobile-collector.com</string>
+    <string name="adeum_screenshot_url">https://example-screenshots.com</string>
+    <string name="adeum_screenshots_enabled">false</string>
+    <string name="adeum_logging_level">1</string>
+    <string name="adeum_interaction_capture_mode">0</string>
+</resources>

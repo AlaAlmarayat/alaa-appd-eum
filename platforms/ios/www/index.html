@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<!--
+  Ala'a AppD EUM - Dual-Instrumentation Debugger
+  Created & Engineered by: Ala'a Mrayat
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="color-scheme" content="light dark">
+
+    <!-- Relaxed Content-Security-Policy (allows runtime custom collector/CDN/API URLs) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: gap: blob:; script-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src * 'self' data: blob:; style-src * 'self' 'unsafe-inline'; img-src * 'self' data: content:; font-src * 'self' data:;">
+
+    <title>Ala'a AppD EUM Debugger</title>
+
+    <!-- 0. Early Network & Beacon Interceptor (MUST run BEFORE ADRUM snapshots XHR/fetch/sendBeacon!) -->
+    <script type="text/javascript">
+        (function() {
+            var defaultCfg = {
+                jsAppKey: "XXX-XXX-XXX",
+                jsBeaconUrl: "https://example-browser-beacon.com",
+                jsCdnUrl: "https://example-cdn.com/adrum/adrum-latest.js",
+                nativeAppKey: "XXX-XXX-XXX",
+                nativeCollectorUrl: "https://example-mobile-collector.com",
+                nativeScreenshotUrl: "https://example-screenshots.com",
+                sessionReplayEnabled: true,
+                sessionReplayUrlHttps: "https://example-session-replay-blobs.com",
+                sessionReplayMaskAllInputs: true,
+                sessionReplayMaskAllText: false,
+                sessionReplayPackAssets: true
+            };
+            var savedCfg = {};
+            try {
+                savedCfg = JSON.parse(localStorage.getItem('eum_debugger_overrides') || '{}');
+            } catch (e) {}
+            window.__EUM_DEFAULT_CONFIG__ = defaultCfg;
+            window.__EUM_ACTIVE_CONFIG__ = {
+                jsAppKey: (savedCfg.jsAppKey || defaultCfg.jsAppKey).trim(),
+                jsBeaconUrl: (savedCfg.jsBeaconUrl || defaultCfg.jsBeaconUrl).trim().replace(/\/+$/, ''),
+                jsCdnUrl: (savedCfg.jsCdnUrl || defaultCfg.jsCdnUrl).trim(),
+                nativeAppKey: (savedCfg.nativeAppKey || defaultCfg.nativeAppKey).trim(),
+                nativeCollectorUrl: (savedCfg.nativeCollectorUrl || defaultCfg.nativeCollectorUrl).trim().replace(/\/+$/, ''),
+                nativeScreenshotUrl: (savedCfg.nativeScreenshotUrl || defaultCfg.nativeScreenshotUrl).trim().replace(/\/+$/, ''),
+                sessionReplayEnabled: (typeof savedCfg.sessionReplayEnabled === 'boolean') ? savedCfg.sessionReplayEnabled : defaultCfg.sessionReplayEnabled,
+                sessionReplayUrlHttps: (savedCfg.sessionReplayUrlHttps || defaultCfg.sessionReplayUrlHttps).trim().replace(/\/+$/, ''),
+                sessionReplayMaskAllInputs: (typeof savedCfg.sessionReplayMaskAllInputs === 'boolean') ? savedCfg.sessionReplayMaskAllInputs : defaultCfg.sessionReplayMaskAllInputs,
+                sessionReplayMaskAllText: (typeof savedCfg.sessionReplayMaskAllText === 'boolean') ? savedCfg.sessionReplayMaskAllText : defaultCfg.sessionReplayMaskAllText,
+                sessionReplayPackAssets: (typeof savedCfg.sessionReplayPackAssets === 'boolean') ? savedCfg.sessionReplayPackAssets : defaultCfg.sessionReplayPackAssets
+            };
+
+            window.__EUM_BRIDGE_ENABLED__ = true;
+            window.__EUM_RELAY_BEACONS__ = true;
+            window.__EUM_EARLY_TX__ = [];
+            window.__EUM_DISPATCH_TX__ = function(tx, isUpdate) {
+                if (typeof window.__EUM_ON_TX__ === 'function') {
+                    window.__EUM_ON_TX__(tx, isUpdate);
+                } else if (!isUpdate) {
+                    window.__EUM_EARLY_TX__.push(tx);
+                }
+            };
+
+            function isEumBeaconUrl(url) {
+                if (!url) return false;
+                var u = url.toString().toLowerCase();
+                var activeJs = (window.__EUM_ACTIVE_CONFIG__.jsBeaconUrl || '').toLowerCase();
+                var activeNative = (window.__EUM_ACTIVE_CONFIG__.nativeCollectorUrl || '').toLowerCase();
+                var activeReplay = (window.__EUM_ACTIVE_CONFIG__.sessionReplayUrlHttps || '').toLowerCase();
+                return (activeJs && u.indexOf(activeJs) !== -1) ||
+                       (activeNative && u.indexOf(activeNative) !== -1) ||
+                       (activeReplay && u.indexOf(activeReplay) !== -1) ||
+                       u.indexOf('/blob-service/') !== -1 ||
+                       u.indexOf('example-browser-beacon.com') !== -1 ||
+                       u.indexOf('example-mobile-collector.com') !== -1 ||
+                       u.indexOf('example-session-replay-blobs.com') !== -1 ||
+                       u.indexOf('/eumcollector/') !== -1 ||
+                       u.indexOf('eum-appdynamics.com') !== -1;
+            }
+
+            // Intercept iOS WKWebView Native JS Agent Handler (window.webkit.messageHandlers.ADEUM_js_handler)
+            try {
+                var wk = window.webkit;
+                if (wk && wk.messageHandlers && wk.messageHandlers.ADEUM_js_handler &&
+                    typeof wk.messageHandlers.ADEUM_js_handler.postMessage === 'function') {
+                    var origPost = wk.messageHandlers.ADEUM_js_handler.postMessage.bind(wk.messageHandlers.ADEUM_js_handler);
+                    wk.messageHandlers.ADEUM_js_handler.postMessage = function(payload) {
+                        var bodyStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
+                        var nativeKey = window.__EUM_ACTIVE_CONFIG__.nativeAppKey || 'XXX-XXX-XXX';
+                        var collUrl = window.__EUM_ACTIVE_CONFIG__.nativeCollectorUrl || 'https://example-mobile-collector.com';
+                        console.log('[EUM-NATIVE-WK-BEACON] 📡 WKWebView -> ADEUM_js_handler -> Native Mobile Agent (' + nativeKey + '): ' + bodyStr.slice(0, 300));
+                        window.__EUM_DISPATCH_TX__({
+                            id: 'wk_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                            timestamp: new Date().toLocaleTimeString(),
+                            method: 'BEACON',
+                            url: 'webkit://ADEUM_js_handler -> ' + collUrl + '/eumcollector/mobileMetrics?version=2',
+                            isBeacon: true,
+                            bridged: true,
+                            requestHeaders: { 'Transport': 'WKScriptMessageHandler (ADEUM_js_handler)' },
+                            requestBody: bodyStr,
+                            status: '200 Handed to Native SDK',
+                            statusCode: 200,
+                            duration: 1,
+                            responseHeaders: {},
+                            responseBody: '[Forwarded by Native ADEUMInstrumentation SDK to ' + nativeKey + ']'
+                        }, false);
+                        return origPost(payload);
+                    };
+                    window.__EUM_WK_HANDLER_HOOKED__ = true;
+                }
+            } catch (e) {}
+
+            // Intercept XMLHttpRequest BEFORE ADRUM caches xhrConstructor/xhrOpen/xhrSend
+            var origOpen = XMLHttpRequest.prototype.open;
+            var origSend = XMLHttpRequest.prototype.send;
+            var origSetReqHeader = XMLHttpRequest.prototype.setRequestHeader;
+
+            XMLHttpRequest.prototype.open = function(method, url) {
+                this.__eumMeta = {
+                    id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                    startTime: Date.now(),
+                    method: (method || 'GET').toUpperCase(),
+                    url: url ? url.toString() : '',
+                    requestHeaders: {},
+                    requestBody: null
+                };
+                return origOpen.apply(this, arguments);
+            };
+
+            XMLHttpRequest.prototype.setRequestHeader = function(header, value) {
+                if (this.__eumMeta) {
+                    this.__eumMeta.requestHeaders[header] = value;
+                }
+                return origSetReqHeader.apply(this, arguments);
+            };
+
+            XMLHttpRequest.prototype.send = function(body) {
+                var meta = this.__eumMeta || {
+                    id: 'tx_' + Date.now(),
+                    startTime: Date.now(),
+                    method: 'XHR',
+                    url: 'unknown',
+                    requestHeaders: {}
+                };
+                if (body) {
+                    if (typeof FormData !== 'undefined' && body instanceof FormData) {
+                        meta.requestBody = '[Multipart FormData: Session Replay Blob Segment]';
+                    } else {
+                        meta.requestBody = typeof body === 'string' ? body : '[Object/Blob payload]';
+                    }
+                }
+                var isReplay = meta.url.indexOf('/blob-service/') !== -1;
+                var isBeacon = isEumBeaconUrl(meta.url) || isReplay;
+                var willBridge = !!window.__EUM_BRIDGE_ENABLED__ && !isBeacon;
+                var trackerHolder = (willBridge && typeof window.__EUM_BEGIN_NATIVE__ === 'function')
+                    ? window.__EUM_BEGIN_NATIVE__(meta.url) : null;
+                var displayMethod = isReplay ? 'REPLAY' : (isBeacon ? 'BEACON' : meta.method);
+
+                var txRecord = {
+                    id: (isReplay ? 'replay_' : 'tx_') + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                    timestamp: new Date().toLocaleTimeString(),
+                    method: displayMethod,
+                    url: meta.url,
+                    isBeacon: isBeacon,
+                    isReplay: isReplay,
+                    bridged: willBridge,
+                    requestHeaders: meta.requestHeaders,
+                    requestBody: meta.requestBody,
+                    status: 'Pending...',
+                    statusCode: 0,
+                    duration: 0,
+                    responseHeaders: {},
+                    responseBody: ''
+                };
+                if (isReplay) {
+                    console.log('[EUM-REPLAY] 🎬 Outbound Session Replay Blob: ' + meta.url);
+                } else if (isBeacon) {
+                    console.log('[EUM-BEACON] 📡 Outbound XHR Beacon: ' + meta.url);
+                } else {
+                    console.log('[EUM-HTTP-REQ] 🚀 ' + meta.method + ' ' + meta.url + (willBridge ? ' [BRIDGED]' : ''));
+                }
+                window.__EUM_DISPATCH_TX__(txRecord, false);
+
+                var self = this;
+                var finished = false;
+                var onDone = function(evtType) {
+                    if (finished) return;
+                    finished = true;
+                    var duration = Date.now() - meta.startTime;
+                    var respHeaders = {};
+                    try {
+                        var rawHeaders = self.getAllResponseHeaders();
+                        if (rawHeaders) {
+                            rawHeaders.trim().split(/[\r\n]+/).forEach(function(line) {
+                                var parts = line.split(': ');
+                                var name = parts.shift();
+                                if (name) respHeaders[name] = parts.join(': ');
+                            });
+                        }
+                    } catch (e) {}
+                    var respBody = '';
+                    try {
+                        respBody = self.responseText || (evtType === 'error' ? '[Network/CORS error on response read]' : '[Empty/Non-text response]');
+                    } catch (e) {
+                        respBody = '[Protected / Binary payload]';
+                    }
+                    var status = self.status || 0;
+                    var statusText = self.statusText || (status === 200 ? 'OK' : (evtType === 'error' ? 'Network/CORS Error' : 'Done'));
+
+                    console.log('[EUM-HTTP-RESP] 📥 ' + txRecord.method + ' ' + meta.url + ' -> ' + status + ' ' + statusText + ' (' + duration + 'ms)');
+                    txRecord.status = status + ' ' + statusText;
+                    txRecord.statusCode = status;
+                    txRecord.duration = duration;
+                    txRecord.responseHeaders = respHeaders;
+                    txRecord.responseBody = respBody;
+                    window.__EUM_DISPATCH_TX__(txRecord, true);
+
+                    if (trackerHolder && typeof window.__EUM_FINISH_NATIVE__ === 'function') {
+                        window.__EUM_FINISH_NATIVE__(trackerHolder, status);
+                    }
+                };
+
+                this.addEventListener('load', function() { onDone('load'); });
+                this.addEventListener('error', function() { onDone('error'); });
+                this.addEventListener('abort', function() { onDone('abort'); });
+
+                // Relay Browser JS Beacons natively via ADEUMMobilePlugin.relayBeacon to bypass WebView CORS (Skip for multipart Replay Blobs)
+                if (isBeacon && !isReplay && window.__EUM_RELAY_BEACONS__ && window.cordova && typeof window.cordova.exec === 'function') {
+                    console.log('[EUM-BEACON-RELAY] 🔁 Relaying Browser JS Beacon via Native HTTP (CORS bypass): ' + meta.url);
+                    window.cordova.exec(
+                        function(res) {
+                            var duration = Date.now() - meta.startTime;
+                            var statusCode = (res && res.statusCode) ? res.statusCode : 200;
+                            var respHeaders = (res && res.headers) ? res.headers : {};
+                            var respBody = (res && res.body) ? res.body : '[200 OK via Native Relay]';
+
+                            console.log('[EUM-BEACON-RELAY] ✅ Native Relay HTTP ' + statusCode + ' (' + duration + 'ms) AppD-Request-Id=' + (respHeaders['AppD-Request-Id'] || respHeaders['appd-request-id'] || 'n/a'));
+                            txRecord.status = statusCode + ' OK (Native Relay)';
+                            txRecord.statusCode = statusCode;
+                            txRecord.duration = duration;
+                            txRecord.responseHeaders = respHeaders;
+                            txRecord.responseBody = respBody;
+                            window.__EUM_DISPATCH_TX__(txRecord, true);
+
+                            try {
+                                Object.defineProperty(self, 'status', { value: statusCode, configurable: true });
+                                Object.defineProperty(self, 'statusText', { value: 'OK', configurable: true });
+                                Object.defineProperty(self, 'readyState', { value: 4, configurable: true });
+                                Object.defineProperty(self, 'responseText', { value: respBody, configurable: true });
+                            } catch (e) {}
+
+                            if (typeof self.onreadystatechange === 'function') {
+                                try { self.onreadystatechange(); } catch (e) {}
+                            }
+                            if (typeof self.onload === 'function') {
+                                try { self.onload(); } catch (e) {}
+                            }
+                        },
+                        function(err) {
+                            var duration = Date.now() - meta.startTime;
+                            var errStr = typeof err === 'string' ? err : JSON.stringify(err);
+                            console.log('[EUM-BEACON-RELAY] ❌ Native Relay Failed: ' + errStr);
+                            txRecord.status = 'Relay Error: ' + errStr;
+                            txRecord.statusCode = 0;
+                            txRecord.duration = duration;
+                            txRecord.responseBody = errStr;
+                            window.__EUM_DISPATCH_TX__(txRecord, true);
+                            if (typeof self.onerror === 'function') {
+                                try { self.onerror(); } catch (e) {}
+                            }
+                        },
+                        'ADEUMMobilePlugin',
+                        'relayBeacon',
+                        [meta.url, meta.requestBody || '']
+                    );
+                    return;
+                }
+
+                return origSend.apply(this, arguments);
+            };
+
+            // Intercept fetch BEFORE ADRUM wraps fetch
+            if (typeof window.fetch === 'function') {
+                var origFetch = window.fetch;
+                window.fetch = async function(input, init) {
+                    var startTime = Date.now();
+                    var url = (typeof input === 'string') ? input : (input && input.url ? input.url : String(input));
+                    var method = (init && init.method) ? init.method.toUpperCase() : 'GET';
+                    var reqHeaders = {};
+                    if (init && init.headers) {
+                        if (init.headers instanceof Headers) {
+                            init.headers.forEach(function(v, k) { reqHeaders[k] = v; });
+                        } else if (typeof init.headers === 'object') {
+                            Object.assign(reqHeaders, init.headers);
+                        }
+                    }
+                    var reqBody = null;
+                    if (init && init.body) {
+                        if (typeof FormData !== 'undefined' && init.body instanceof FormData) {
+                            reqBody = '[Multipart FormData: Session Replay Blob Segment]';
+                        } else {
+                            reqBody = String(init.body);
+                        }
+                    }
+                    var isReplay = url.indexOf('/blob-service/') !== -1;
+                    var isBeacon = isEumBeaconUrl(url) || isReplay;
+                    var willBridge = !!window.__EUM_BRIDGE_ENABLED__ && !isBeacon;
+                    var trackerHolder = (willBridge && typeof window.__EUM_BEGIN_NATIVE__ === 'function')
+                        ? window.__EUM_BEGIN_NATIVE__(url) : null;
+                    var displayMethod = isReplay ? 'REPLAY' : (isBeacon ? 'BEACON' : method);
+
+                    var txRecord = {
+                        id: (isReplay ? 'replay_' : 'tx_') + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                        timestamp: new Date().toLocaleTimeString(),
+                        method: displayMethod,
+                        url: url,
+                        isBeacon: isBeacon,
+                        isReplay: isReplay,
+                        bridged: willBridge,
+                        requestHeaders: reqHeaders,
+                        requestBody: reqBody,
+                        status: 'Pending...',
+                        statusCode: 0,
+                        duration: 0,
+                        responseHeaders: {},
+                        responseBody: ''
+                    };
+                    if (isReplay) {
+                        console.log('[EUM-REPLAY] 🎬 Outbound Session Replay Blob: ' + url);
+                    } else if (isBeacon) {
+                        console.log('[EUM-BEACON] 📡 Outbound Fetch Beacon: ' + url);
+                    } else {
+                        console.log('[EUM-HTTP-REQ] 🚀 ' + method + ' ' + url + (willBridge ? ' [BRIDGED]' : ''));
+                    }
+                    window.__EUM_DISPATCH_TX__(txRecord, false);
+
+                    try {
+                        var response = await origFetch.apply(this, arguments);
+                        var duration = Date.now() - startTime;
+                        var cloned = response.clone();
+                        var respHeaders = {};
+                        cloned.headers.forEach(function(v, k) { respHeaders[k] = v; });
+                        var respBody = '';
+                        try { respBody = await cloned.text(); } catch (e) { respBody = '[Error reading body]'; }
+
+                        console.log('[EUM-HTTP-RESP] 📥 ' + txRecord.method + ' ' + url + ' -> ' + response.status + ' (' + duration + 'ms)');
+                        txRecord.status = response.status + ' ' + (response.statusText || 'OK');
+                        txRecord.statusCode = response.status;
+                        txRecord.duration = duration;
+                        txRecord.responseHeaders = respHeaders;
+                        txRecord.responseBody = respBody;
+                        window.__EUM_DISPATCH_TX__(txRecord, true);
+
+                        if (trackerHolder && typeof window.__EUM_FINISH_NATIVE__ === 'function') {
+                            window.__EUM_FINISH_NATIVE__(trackerHolder, response.status);
+                        }
+                        return response;
+                    } catch (err) {
+                        var duration = Date.now() - startTime;
+                        console.log('[EUM-HTTP-RESP] ❌ ' + txRecord.method + ' ' + url + ' -> Error: ' + err.message);
+                        txRecord.status = 'Error: ' + err.message;
+                        txRecord.statusCode = 0;
+                        txRecord.duration = duration;
+                        txRecord.responseBody = 'Fetch network failure: ' + (err.stack || err.message);
+                        window.__EUM_DISPATCH_TX__(txRecord, true);
+
+                        if (trackerHolder && typeof window.__EUM_FINISH_NATIVE__ === 'function') {
+                            window.__EUM_FINISH_NATIVE__(trackerHolder, 0, err.message);
+                        }
+                        throw err;
+                    }
+                };
+            }
+
+            // Intercept navigator.sendBeacon BEFORE ADRUM uses it
+            if (navigator.sendBeacon) {
+                var origBeacon = navigator.sendBeacon.bind(navigator);
+                navigator.sendBeacon = function(url, data) {
+                    var isBeacon = isEumBeaconUrl(url);
+                    var payload = data ? String(data) : '';
+                    console.log('[EUM-BEACON] 📡 navigator.sendBeacon -> ' + url + ' (' + payload.length + ' bytes)');
+                    window.__EUM_DISPATCH_TX__({
+                        id: 'beacon_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
+                        timestamp: new Date().toLocaleTimeString(),
+                        method: 'BEACON',
+                        url: url ? url.toString() : '',
+                        isBeacon: isBeacon,
+                        bridged: false,
+                        requestHeaders: { 'Transport': 'navigator.sendBeacon', 'Content-Type': 'text/plain' },
+                        requestBody: payload,
+                        status: '204 Dispatched (sendBeacon)',
+                        statusCode: 204,
+                        duration: 1,
+                        responseHeaders: {},
+                        responseBody: '[Queued asynchronously via navigator.sendBeacon]'
+                    }, false);
+                    return origBeacon(url, data);
+                };
+            }
+        })();
+    </script>
+
+    <!-- 1. Inject AppDynamics Browser JS Agent BEFORE any other scripts -->
+    <script type="text/javascript">
+        (function() {
+            var active = window.__EUM_ACTIVE_CONFIG__ || {};
+            var jsBeacon = active.jsBeaconUrl || "https://example-browser-beacon.com";
+            var extBase = "https://example-cdn.com";
+            try { extBase = new URL(jsBeacon).origin; } catch (e) {}
+
+            window["adrum-start-time"] = new Date().getTime();
+            (function(config){
+                config.appKey = active.jsAppKey || "XXX-XXX-XXX";
+                config.adrumExtUrlHttp = "js";
+                config.adrumExtUrlHttps = "js";
+                config.beaconUrlHttp = jsBeacon;
+                config.beaconUrlHttps = jsBeacon;
+                config.useHTTPSAlways = true;
+                config.spa = { "spa2": true };
+                config.xd = { "enable": false };
+
+                if (active.sessionReplayEnabled !== false) {
+                    var replayCollector = active.sessionReplayUrlHttps || jsBeacon;
+                    config.sessionReplay = {
+                        enabled: true,
+                        sessionReplayUrlHttps: replayCollector,
+                        sessionReplayScriptUrl: "js",
+                        enableReplayFolderVersioning: false,
+                        packAssets: active.sessionReplayPackAssets !== false,
+                        iframes: true,
+                        maskAllInputs: active.sessionReplayMaskAllInputs !== false,
+                        maskAllText: !!active.sessionReplayMaskAllText,
+                        persistence: false
+                    };
+                    console.log("[EUM-REPLAY-INIT] 🎬 Browser Session Replay configured: collector=" + replayCollector);
+                } else {
+                    console.log("[EUM-REPLAY-INIT] ⏸️ Browser Session Replay disabled in configuration");
+                }
+            })(window["adrum-config"] || (window["adrum-config"] = {}));
+        })();
+    </script>
+    <!-- Local bundled ADRUM agent (0 network latency, avoids WebView cold-start connection timeout) -->
+    <script src="js/adrum.js"></script>
+
+    <link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+
+    <!-- Persistent App Header -->
+    <header class="app-header">
+        <div class="brand">
+            <div class="brand-icon" style="background: linear-gradient(135deg, #a855f7 0%, #06b6d4 100%); font-weight: 900; letter-spacing: -0.5px;">AM</div>
+            <div>
+                <div class="brand-title">Ala'a AppD EUM</div>
+                <div style="font-size: 10px; color: var(--text-muted);">Ala'a Mrayat • EUM Diagnostics</div>
+            </div>
+        </div>
+        <div class="header-badges">
+            <span id="chip-adrum" class="chip">ADRUM</span>
+            <span id="chip-native" class="chip">Native</span>
+            <span id="chip-replay" class="chip">Replay</span>
+        </div>
+    </header>
+
+    <!-- Main Screens Container -->
+    <main>
+        <!-- SCREEN 1: STATUS (#home) -->
+        <section id="screen-home" class="screen active">
+            <div class="card">
+                <div class="card-title">
+                    <span><span>🛡️</span> Agent Instrumentation Status</span>
+                    <button id="btn-refresh-status" class="chip" style="cursor: pointer;">↻ Check</button>
+                </div>
+                <div class="status-list">
+                    <div class="status-item">
+                        <div class="status-item-info">
+                            <span class="status-item-name">Browser JS Agent (ADRUM)</span>
+                            <span class="status-item-desc" id="desc-adrum">window.ADRUM in memory</span>
+                        </div>
+                        <div id="status-adrum" class="status-indicator">
+                            <span class="dot amber"></span> Checking...
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-item-info">
+                            <span class="status-item-name">Native Mobile Agent</span>
+                            <span class="status-item-desc">window.plugins.ADEUMMobilePlugin</span>
+                        </div>
+                        <div id="status-native" class="status-indicator">
+                            <span class="dot amber"></span> Waiting Cordova...
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-item-info">
+                            <span class="status-item-name">WKWebView Native JS Handler</span>
+                            <span class="status-item-desc">webkit.messageHandlers.ADEUM_js_handler</span>
+                        </div>
+                        <div id="status-wkhandler" class="status-indicator">
+                            <span class="dot amber"></span> Checking...
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-item-info">
+                            <span class="status-item-name">Browser Session Replay (RUM)</span>
+                            <span class="status-item-desc" id="desc-replay">Splunk/AppD 25.10+ Session Replay Agent</span>
+                        </div>
+                        <div id="status-replay" class="status-indicator">
+                            <span class="dot purple"></span> Initializing...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span><span>⚙️</span> EUM Configuration Matrix</span>
+                </div>
+                <div class="kv-grid">
+                    <div class="kv-item">
+                        <div class="kv-label">JS App Key (Browser)</div>
+                        <div class="kv-value" id="env-adrum-key" style="color: var(--accent-blue);">XXX-XXX-XXX</div>
+                    </div>
+                    <div class="kv-item">
+                        <div class="kv-label">Native App Key (Mobile)</div>
+                        <div class="kv-value" id="env-native-key" style="color: var(--accent-green);">XXX-XXX-XXX</div>
+                    </div>
+                    <div class="kv-item full-width">
+                        <div class="kv-label">Active ADRUM Version & Beacon URL</div>
+                        <div class="kv-value" id="env-adrum-runtime">Detecting...</div>
+                    </div>
+                    <div class="kv-item full-width">
+                        <div class="kv-label">Native Collector Endpoint</div>
+                        <div class="kv-value" id="env-native-collector">https://example-mobile-collector.com</div>
+                    </div>
+                    <div class="kv-item">
+                        <div class="kv-label">Native Logging Level</div>
+                        <div class="kv-value">1</div>
+                    </div>
+                    <div class="kv-item">
+                        <div class="kv-label">Screenshots</div>
+                        <div class="kv-value">Disabled (false)</div>
+                    </div>
+                    <div class="kv-item">
+                        <div class="kv-label">Session Replay</div>
+                        <div class="kv-value" id="env-replay-state" style="color: var(--accent-purple);">Enabled</div>
+                    </div>
+                    <div class="kv-item full-width">
+                        <div class="kv-label">Session Replay Blob Endpoint</div>
+                        <div class="kv-value" id="env-replay-endpoint" style="font-size: 11px;">https://example-session-replay-blobs.com/blob-service/v1/appkeys/XXX-XXX-XXX/browser/blobs</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span><span>🛠️</span> Edit URLs & App Keys (Runtime)</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="font-size: 11px; color: var(--text-muted);">
+                        Browser JS App Key (ADRUM)
+                        <input type="text" id="cfg-js-key" placeholder="XXX-XXX-XXX" style="width: 100%; margin-top: 3px; background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-family: var(--code-font); font-size: 12px;">
+                    </label>
+                    <label style="font-size: 11px; color: var(--text-muted);">
+                        Browser JS Beacon URL
+                        <input type="text" id="cfg-js-beacon-url" placeholder="https://example-browser-beacon.com" style="width: 100%; margin-top: 3px; background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-family: var(--code-font); font-size: 12px;">
+                    </label>
+                    <label style="font-size: 11px; color: var(--text-muted);">
+                        Browser JS Agent Script URL
+                        <input type="text" id="cfg-js-cdn-url" placeholder="https://example-cdn.com/adrum/adrum-latest.js" style="width: 100%; margin-top: 3px; background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-family: var(--code-font); font-size: 12px;">
+                    </label>
+                    <label style="font-size: 11px; color: var(--text-muted);">
+                        Native Mobile App Key (Cordova / Android / iOS)
+                        <input type="text" id="cfg-native-key" placeholder="XXX-XXX-XXX" style="width: 100%; margin-top: 3px; background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-family: var(--code-font); font-size: 12px;">
+                    </label>
+                    <label style="font-size: 11px; color: var(--text-muted);">
+                        Native Collector URL (applies on next cold launch)
+                        <input type="text" id="cfg-native-collector-url" placeholder="https://example-mobile-collector.com" style="width: 100%; margin-top: 3px; background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-family: var(--code-font); font-size: 12px;">
+                    </label>
+
+                    <!-- Browser Session Replay Controls -->
+                    <div style="margin-top: 4px; padding: 10px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                            <div>
+                                <span style="font-size: 12px; font-weight: 700; color: #d8b4fe;">Browser Session Replay (25.10+)</span>
+                                <div style="font-size: 10px; color: var(--text-muted);">Record DOM events &amp; user interactions</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="cfg-replay-toggle" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 6px;">
+                            Session Replay Blob URL
+                            <input type="text" id="cfg-replay-url" placeholder="https://example-session-replay-blobs.com" style="width: 100%; margin-top: 3px; background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-family: var(--code-font); font-size: 12px;">
+                        </label>
+                        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); cursor: pointer;">
+                                <input type="checkbox" id="cfg-replay-mask-inputs" checked>
+                                <span>Mask All Form Inputs (Privacy)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); cursor: pointer;">
+                                <input type="checkbox" id="cfg-replay-mask-text">
+                                <span>Mask All Page Text Content</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); cursor: pointer;">
+                                <input type="checkbox" id="cfg-replay-pack-assets" checked>
+                                <span>Pack Static CSS / Assets</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;">
+                        <button id="btn-save-eum-config" class="btn btn-primary" style="padding: 10px;">
+                            <span>Save &amp; Apply</span>
+                        </button>
+                        <button id="btn-reset-eum-config" class="btn btn-secondary" style="padding: 10px;">
+                            <span>Reset Defaults</span>
+                        </button>
+                    </div>
+                    <div id="cfg-save-status" style="font-size: 11px; color: var(--text-muted); min-height: 16px;"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span><span>📱</span> Environment & Platform</span>
+                </div>
+                <div class="kv-grid">
+                    <div class="kv-item">
+                        <div class="kv-label">Platform</div>
+                        <div id="env-platform" class="kv-value">Detecting...</div>
+                    </div>
+                    <div class="kv-item">
+                        <div class="kv-label">Cordova Ready</div>
+                        <div id="env-cordova" class="kv-value">No</div>
+                    </div>
+                    <div class="kv-item full-width">
+                        <div class="kv-label">User Agent</div>
+                        <div id="env-ua" class="kv-value" style="font-size: 10px;">-</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 2: API TRANSACTIONS (#api-test) -->
+        <section id="screen-api-test" class="screen">
+            <!-- Native Bridging Toggle Card -->
+            <div class="toggle-wrapper">
+                <div class="toggle-info">
+                    <div class="toggle-title">
+                        <span>Bridge XHR to Native Plugin</span>
+                        <span id="bridge-status-badge" class="chip active">ON (Dual-Key Bridging)</span>
+                    </div>
+                    <div class="toggle-subtitle">
+                        When ON, reports every call & screen view into Native Key <strong>XXX-XXX-XXX</strong> alongside Browser Key <strong>XXX-XXX-XXX</strong>.
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-native-bridge" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- Browser Beacon CORS Bypass Toggle Card -->
+            <div class="toggle-wrapper">
+                <div class="toggle-info">
+                    <div class="toggle-title">
+                        <span>Relay Browser Beacons (Bypass CORS)</span>
+                        <span id="beacon-relay-badge" class="chip active">ON (Native HTTP)</span>
+                    </div>
+                    <div class="toggle-subtitle">
+                        Sends Browser JS beacons via Native HTTP to bypass WebView CORS errors on <code>https://localhost</code> / <code>app://localhost</code>.
+                    </div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-beacon-relay" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span><span>🚀</span> Standard Transaction Triggers</span>
+                </div>
+                <div class="btn-group">
+                    <button id="btn-api-users" class="btn btn-primary">
+                        <span>GET Users (200 OK)</span>
+                        <span style="font-size: 10px; opacity: 0.8;">fetch() • jsonplaceholder</span>
+                    </button>
+
+                    <button id="btn-api-post" class="btn btn-secondary">
+                        <span>POST Payload (200 OK)</span>
+                        <span style="font-size: 10px; opacity: 0.8;">XMLHttpRequest • httpbin.org</span>
+                    </button>
+
+                    <button id="btn-api-error" class="btn btn-danger">
+                        <span>Simulate 500 Server Error</span>
+                        <span style="font-size: 10px; opacity: 0.8;">fetch() • httpbin.org/status/500</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom Request Form -->
+            <div class="card">
+                <div class="card-title">
+                    <span><span>🔧</span> Custom HTTP Transaction</span>
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <select id="custom-method" style="background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-weight: 700; width: 90px;">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                    <input type="text" id="custom-url" value="https://jsonplaceholder.typicode.com/posts/1" placeholder="https://..." style="flex: 1; background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-family: var(--code-font); font-size: 12px;">
+                </div>
+                <button id="btn-custom-send" class="btn btn-secondary" style="margin-top: 4px;">Send Custom Request</button>
+            </div>
+
+            <!-- Native Device HTTP Request (Auto-Instrumented by Native SDK) -->
+            <div class="card">
+                <div class="card-title">
+                    <span><span>📲</span> Native Device HTTP Request</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+                    Executes directly in native Android (<code>HttpURLConnection</code>) or iOS (<code>NSURLSession</code>) to test automatic Mobile RUM HTTP capture without WebView.
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <select id="native-http-method" style="background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-weight: 700; width: 90px;">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                    <input type="text" id="native-http-url" value="https://jsonplaceholder.typicode.com/todos/1" placeholder="https://..." style="flex: 1; background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-family: var(--code-font); font-size: 12px;">
+                </div>
+                <input type="text" id="native-http-body" placeholder='Optional JSON body for POST/PUT, e.g. {"test":1}' style="width: 100%; margin-bottom: 8px; background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-family: var(--code-font); font-size: 12px;">
+                <button id="btn-native-http-send" class="btn btn-primary">
+                    <span>Send Native OS HTTP Request</span>
+                    <span style="font-size: 10px; opacity: 0.8;">HttpURLConnection (Android) / NSURLSession (iOS)</span>
+                </button>
+            </div>
+
+            <!-- Browser Session Replay Interactive Playground -->
+            <div class="card" style="border-color: rgba(168, 85, 247, 0.3);">
+                <div class="card-title">
+                    <span><span>🎬</span> Browser Session Replay Playground</span>
+                    <span id="replay-live-badge" class="chip active">Recording</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+                    Interact with inputs or click Mutate DOM to generate mutation and interaction events. ADRUM packages these into binary segments and uploads to <code>/blob-service/</code>.
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" id="replay-input-unmasked" placeholder="Public text input (Captured in Session Replay)" style="background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-size: 12px;">
+                    <input type="password" id="replay-input-masked" placeholder="Sensitive password / PIN (Masked with ***)" style="background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-size: 12px;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <button id="btn-replay-mutate" class="btn btn-secondary">
+                        <span>Mutate DOM (Add Element)</span>
+                    </button>
+                    <button id="btn-replay-flush" class="btn btn-primary">
+                        <span>Flush Replay Blobs</span>
+                    </button>
+                </div>
+                <div id="replay-mutation-target" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;"></div>
+            </div>
+
+            <!-- Last Execution Feedback -->
+            <div class="card" id="api-feedback-card" style="display: none;">
+                <div class="card-title">
+                    <span><span>📝</span> Last Request Result</span>
+                    <span id="api-feedback-status" class="chip">Status</span>
+                </div>
+                <pre id="api-feedback-body" class="code-block"></pre>
+            </div>
+        </section>
+
+        <!-- SCREEN 3: LIVE TRANSACTION INSPECTOR (#inspector) -->
+        <section id="screen-inspector" class="screen">
+            <div class="inspector-actions">
+                <div>
+                    <span style="font-weight: 700; font-size: 14px;">Live Transaction Stream</span>
+                    <span id="tx-counter" class="badge-counter">0 total</span>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                    <button id="btn-flush-beacons" class="chip active" style="cursor: pointer;">⚡ Flush Beacons</button>
+                    <button id="btn-export-log" class="chip" style="cursor: pointer;">Export</button>
+                    <button id="btn-clear-log" class="chip" style="cursor: pointer; color: var(--accent-red);">Clear</button>
+                </div>
+            </div>
+
+            <!-- Outbound Beacon Summary Banner -->
+            <div class="card" style="padding: 10px 14px; background: rgba(168, 85, 247, 0.08); border-color: rgba(168, 85, 247, 0.25);">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="dot green" id="beacon-live-dot" style="animation: pulse 1.5s infinite;"></span>
+                        <div>
+                            <div style="font-size: 12px; font-weight: 700; color: var(--accent-purple);">EUM Beacon Monitor</div>
+                            <div style="font-size: 10px; color: var(--text-secondary);" id="beacon-summary-text">Targeting Active Collector Endpoint</div>
+                        </div>
+                    </div>
+                    <span id="beacon-counter-chip" class="chip" style="background: rgba(168, 85, 247, 0.2); color: #d8b4fe;">0 Beacons</span>
+                </div>
+            </div>
+
+            <!-- Filter Buttons -->
+            <div class="inspector-toolbar">
+                <button class="filter-btn active" data-filter="all">All Traffic</button>
+                <button class="filter-btn" data-filter="api">API Calls</button>
+                <button class="filter-btn" data-filter="beacons">AppD Beacons</button>
+                <button class="filter-btn" data-filter="replay">Replay Blobs</button>
+                <button class="filter-btn" data-filter="bridged">Native Bridged</button>
+                <button class="filter-btn" data-filter="errors">Errors</button>
+            </div>
+
+            <!-- Transaction List -->
+            <div id="transaction-list" class="transaction-list">
+                <div class="empty-state" id="tx-empty">
+                    <div class="empty-icon">📡</div>
+                    <div>No HTTP traffic captured yet</div>
+                    <div style="font-size: 11px; margin-top: 4px;">Trigger calls from the API Test tab to inspect headers & payloads</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 4: MANUAL EUM TRIGGERS (#eum-bridge) -->
+        <section id="screen-eum-bridge" class="screen">
+            <div class="card">
+                <div class="card-title">
+                    <span><span>🌐</span> Browser Agent (ADRUM) Triggers</span>
+                </div>
+                <div class="btn-group">
+                    <button id="btn-trigger-vpage" class="btn btn-secondary">
+                        <span>Trigger Virtual Page View</span>
+                        <span style="font-size: 10px; opacity: 0.8;">ADRUM.markVirtualPageBegin / End</span>
+                    </button>
+                    <button id="btn-flush-all-bridge" class="btn btn-primary">
+                        <span>Flush Browser & Native Beacons Now</span>
+                        <span style="font-size: 10px; opacity: 0.8;">ADRUM.channel.sendBeacon + ADEUMMobilePlugin.flush()</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span><span>⏱️</span> Native Timer Triggers</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <button id="btn-start-timer" class="btn btn-secondary">
+                        <span>Start Timer</span>
+                    </button>
+                    <button id="btn-stop-timer" class="btn btn-secondary">
+                        <span>Stop Timer</span>
+                    </button>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+                    Timer: <code>"Checkout_Flow_Timer"</code> (Reports to Native Mobile Agent)
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span><span>🍞</span> Native Breadcrumbs</span>
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" id="breadcrumb-input" value="User tapped transfer button" placeholder="Breadcrumb message..." style="flex: 1; background: #090d16; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-size: 12px;">
+                </div>
+                <button id="btn-leave-breadcrumb" class="btn btn-secondary">
+                    <span>Leave Breadcrumb</span>
+                    <span style="font-size: 10px; opacity: 0.8;">ADEUMMobilePlugin.leaveBreadcrumb()</span>
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span><span>💥</span> Crash &amp; Exception Tester</span>
+                </div>
+                <div class="btn-group">
+                    <button id="btn-trigger-exception" class="btn btn-secondary">
+                        <span>Throw Test JS Exception</span>
+                        <span style="font-size: 10px; opacity: 0.8;">Tests EUM Uncaught JS Error Logging</span>
+                    </button>
+                    <button id="btn-trigger-native-crash" class="btn btn-danger">
+                        <span>Crash App (Native Crash)</span>
+                        <span style="font-size: 10px; opacity: 0.8;">Uncaught Native Runtime Exception (Terminates App)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Console Log for Triggers -->
+            <div class="card">
+                <div class="card-title">
+                    <span><span>📋</span> Bridge Execution Log</span>
+                    <button id="btn-clear-console" class="chip" style="cursor: pointer;">Clear</button>
+                </div>
+                <div id="bridge-console" class="console-box">
+                    <div class="console-entry info"><span class="time">[System]</span> Bridge log initialized. Ready for events.</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Persistent Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+        <a href="#home" class="nav-item active" data-screen="home">
+            <span class="nav-icon">📊</span>
+            <span>Status</span>
+        </a>
+        <a href="#api-test" class="nav-item" data-screen="api-test">
+            <span class="nav-icon">⚡</span>
+            <span>API Test</span>
+        </a>
+        <a href="#inspector" class="nav-item" data-screen="inspector">
+            <span class="nav-icon">🔍</span>
+            <span>Inspector</span>
+        </a>
+        <a href="#eum-bridge" class="nav-item" data-screen="eum-bridge">
+            <span class="nav-icon">🌉</span>
+            <span>EUM Bridge</span>
+        </a>
+    </nav>
+
+    <!-- Scripts -->
+    <script src="cordova.js"></script>
+    <script src="js/index.js"></script>
+</body>
+</html>

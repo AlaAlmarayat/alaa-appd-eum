@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Ala'a AppD EUM</string>
+	<key>CFBundleIdentifier</key>
+	<string/>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>WebAssembly</string>
+			<key>UTTypeIdentifier</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<string>wasm</string>
+				<key>public.mime-type</key>
+				<string>application/wasm</string>
+			</dict>
+		</dict>
+	</array>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>ADEUM_Settings</key>
+	<dict>
+		<key>ForceWebviewInstrumentation</key>
+		<false/>
+		<key>ForceAjaxInstrumentation</key>
+		<false/>
+		<key>ADRUMExtUrlHttp</key>
+		<string>http://cdn.appdynamics.com</string>
+		<key>ADRUMExtUrlHttps</key>
+		<string>https://cdn.appdynamics.com</string>
+		<key>ADEUM_APP_KEY</key>
+		<string>XXX-XXX-XXX</string>
+		<key>ADEUM_COLLECTOR_URL</key>
+		<string>https://example-mobile-collector.com</string>
+		<key>ADEUM_SCREENSHOT_URL</key>
+		<string>https://example-screenshots.com</string>
+		<key>ADEUM_SCREENSHOTS_ENABLED</key>
+		<string>false</string>
+		<key>ADEUM_LOGGING_LEVEL</key>
+		<string>1</string>
+		<key>ADEUM_REACHABILITY_HOST</key>
+		<string>www.google.com</string>
+		<key>ADEUM_INTERACTION_CAPTURE_MODE</key>
+		<string>0</string>
+	</dict>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

@@ -1,0 +1,66 @@
+{
+  "prepare_queue": {
+    "installed": [],
+    "uninstalled": []
+  },
+  "config_munge": {
+    "files": {
+      "config.xml": {
+        "parents": {
+          "/*": [
+            {
+              "xml": "<feature name=\"ADEUMMobilePlugin\"><param name=\"ios-package\" onload=\"true\" value=\"ADEUMMobilePlugin\" /><param name=\"onload\" value=\"true\" /></feature>",
+              "count": 1
+            }
+          ]
+        }
+      },
+      "*-Info.plist": {
+        "parents": {
+          "ADEUM_Settings": [
+            {
+              "xml": "<key>ADEUM_Settings</key>",
+              "count": 1
+            },
+            {
+              "xml": "<dict><key>ForceWebviewInstrumentation</key><false /><key>ForceAjaxInstrumentation</key><false /><key>ADRUMExtUrlHttp</key><string>http://cdn.appdynamics.com</string><key>ADRUMExtUrlHttps</key><string>https://cdn.appdynamics.com</string><key>ADEUM_APP_KEY</key><string>XXX-XXX-XXX</string><key>ADEUM_COLLECTOR_URL</key><string>https://example-mobile-collector.com</string><key>ADEUM_SCREENSHOT_URL</key><string>https://example-screenshots.com</string><key>ADEUM_SCREENSHOTS_ENABLED</key><string>false</string><key>ADEUM_LOGGING_LEVEL</key><string>1</string><key>ADEUM_REACHABILITY_HOST</key><string>www.google.com</string><key>ADEUM_INTERACTION_CAPTURE_MODE</key><string>0</string></dict>",
+              "count": 1
+            }
+          ],
+          "NSAppTransportSecurity": [
+            {
+              "xml": "<dict><key>NSAllowsArbitraryLoads</key><true /></dict>",
+              "count": 32
+            }
+          ]
+        }
+      }
+    }
+  },
+  "installed_plugins": {
+    "appd-plugin-eum-mobile": {
+      "APP_KEY": "XXX-XXX-XXX",
+      "COLLECTOR_URL": "https://example-mobile-collector.com",
+      "SCREENSHOT_URL": "https://example-screenshots.com",
+      "SCREENSHOTS_ENABLED": "false",
+      "LOGGING_LEVEL": "1",
+      "REACHABILITY_HOST": "www.google.com",
+      "INTERACTION_CAPTURE_MODE": "0",
+      "PACKAGE_NAME": "com.alamrayat.eumdebug"
+    }
+  },
+  "dependent_plugins": {},
+  "modules": [
+    {
+      "id": "appd-plugin-eum-mobile.ADEUMMobilePlugin",
+      "file": "plugins/appd-plugin-eum-mobile/www/ADEUMMobilePlugin.js",
+      "pluginId": "appd-plugin-eum-mobile",
+      "clobbers": [
+        "ADEUMMobilePlugin"
+      ]
+    }
+  ],
+  "plugin_metadata": {
+    "appd-plugin-eum-mobile": "1.0.0"
+  }
+}

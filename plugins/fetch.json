@@ -1,0 +1,15 @@
+{
+  "appd-plugin-eum-mobile": {
+    "source": {
+      "type": "registry",
+      "id": "appd-plugin-eum-mobile"
+    },
+    "is_top_level": true,
+    "variables": {
+      "APP_KEY": "XXX-XXX-XXX",
+      "COLLECTOR_URL": "https://example-mobile-collector.com",
+      "LOGGING_LEVEL": "1",
+      "SCREENSHOTS_ENABLED": "false"
+    }
+  }
+}

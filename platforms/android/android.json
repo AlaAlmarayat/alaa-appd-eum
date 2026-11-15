@@ -1,0 +1,106 @@
+{
+  "prepare_queue": {
+    "installed": [],
+    "uninstalled": []
+  },
+  "config_munge": {
+    "files": {
+      "res/xml/config.xml": {
+        "parents": {
+          "/*": [
+            {
+              "xml": "<feature name=\"ADEUMMobilePlugin\"><param name=\"android-package\" value=\"com.appdynamics.cordova.plugin.ADEUMMobilePlugin\" /><param name=\"onload\" value=\"true\" /></feature>",
+              "count": 1
+            }
+          ]
+        }
+      },
+      "res/values/strings.xml": {
+        "parents": {
+          "/*": [
+            {
+              "xml": "<string name=\"adeum_app_key\">XXX-XXX-XXX</string>",
+              "count": 1
+            },
+            {
+              "xml": "<string name=\"adeum_collector_url\">https://example-mobile-collector.com</string>",
+              "count": 1
+            },
+            {
+              "xml": "<string name=\"adeum_screenshot_url\">https://image.eum-appdynamics.com</string>",
+              "count": 1
+            },
+            {
+              "xml": "<string name=\"adeum_screenshots_enabled\">false</string>",
+              "count": 1
+            },
+            {
+              "xml": "<string name=\"adeum_logging_level\">1</string>",
+              "count": 1
+            },
+            {
+              "xml": "<string name=\"adeum_interaction_capture_mode\">0</string>",
+              "count": 1
+            }
+          ]
+        }
+      },
+      "app/src/main/AndroidManifest.xml": {
+        "parents": {
+          "/manifest/application": [
+            {
+              "xml": "<application android:networkSecurityConfig=\"@xml/network_security_config\" android:usesCleartextTraffic=\"true\" />",
+              "count": 1,
+              "mode": "merge",
+              "id": "config.xml",
+              "oldAttrib": {
+                "android:hardwareAccelerated": "true",
+                "android:icon": "@mipmap/ic_launcher",
+                "android:label": "@string/app_name",
+                "android:networkSecurityConfig": "@xml/network_security_config",
+                "android:supportsRtl": "true",
+                "android:usesCleartextTraffic": "true"
+              }
+            }
+          ]
+        }
+      },
+      "AndroidManifest.xml": {
+        "parents": {
+          "/*": [
+            {
+              "xml": "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />",
+              "count": 37
+            }
+          ]
+        }
+      }
+    }
+  },
+  "installed_plugins": {
+    "appd-plugin-eum-mobile": {
+      "APP_KEY": "XXX-XXX-XXX",
+      "COLLECTOR_URL": "https://example-mobile-collector.com",
+      "SCREENSHOT_URL": "https://image.eum-appdynamics.com",
+      "SCREENSHOTS_ENABLED": "false",
+      "LOGGING_LEVEL": "1",
+      "REACHABILITY_HOST": "www.google.com",
+      "INTERACTION_CAPTURE_MODE": "0",
+      "PACKAGE_NAME": "com.alamrayat.eumdebug"
+    }
+  },
+  "dependent_plugins": {},
+  "modules": [
+    {
+      "id": "appd-plugin-eum-mobile.ADEUMMobilePlugin",
+      "file": "plugins/appd-plugin-eum-mobile/www/ADEUMMobilePlugin.js",
+      "pluginId": "appd-plugin-eum-mobile",
+      "clobbers": [
+        "ADEUMMobilePlugin"
+      ]
+    }
+  ],
+  "plugin_metadata": {
+    "appd-plugin-eum-mobile": "1.0.0"
+  }
+}

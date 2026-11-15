@@ -1,0 +1,19 @@
+{
+  "appDynamics": {
+    "js": {
+      "cdnUrl": "https://example-cdn.com/adrum/adrum-latest.js",
+      "appKey": "XXX-XXX-XXX",
+      "adrumExtUrlHttp": "js",
+      "adrumExtUrlHttps": "js",
+      "beaconUrlHttp": "https://example-browser-beacon.com",
+      "beaconUrlHttps": "https://example-browser-beacon.com",
+      "useHTTPSAlways": true
+    },
+    "native": {
+      "appKey": "XXX-XXX-XXX",
+      "collectorUrl": "https://example-mobile-collector.com",
+      "loggingLevel": 1,
+      "screenshots": false
+    }
+  }
+}

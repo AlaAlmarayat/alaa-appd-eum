@@ -1,0 +1,22 @@
+{
+  "prepare_queue": {
+    "installed": [],
+    "uninstalled": []
+  },
+  "config_munge": {
+    "files": {}
+  },
+  "installed_plugins": {
+    "appd-plugin-eum-mobile": {
+      "APP_KEY": "XXX-XXX-XXX",
+      "COLLECTOR_URL": "https://example-mobile-collector.com",
+      "SCREENSHOT_URL": "https://image.eum-appdynamics.com",
+      "SCREENSHOTS_ENABLED": "false",
+      "LOGGING_LEVEL": "1",
+      "REACHABILITY_HOST": "www.google.com",
+      "INTERACTION_CAPTURE_MODE": "0",
+      "PACKAGE_NAME": "com.alamrayat.eumdebug"
+    }
+  },
+  "dependent_plugins": {}
+}

@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.alamrayat.eumdebug" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <feature name="ADEUMMobilePlugin">
+        <param name="android-package" value="com.appdynamics.cordova.plugin.ADEUMMobilePlugin" />
+        <param name="onload" value="true" />
+    </feature>
+    <name>Ala'a AppD EUM</name>
+    <description>
+        AppDynamics EUM Dual-Instrumentation Debugger by Ala'a Mrayat
+    </description>
+    <author email="dev@ala-mrayat.com" href="https://appdynamics.com">
+        Ala'a Mrayat
+    </author>
+    <icon src="res/icon.png" />
+    <content src="index.html" />
+    <access origin="*" />
+    <allow-navigation href="*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+    <allow-intent href="tel:*" />
+    <allow-intent href="sms:*" />
+    <allow-intent href="mailto:*" />
+    <allow-intent href="geo:*" />
+    <hook src="hooks/after_prepare/patch_appd.js" type="after_prepare" />
+    <config-file parent="/*" target="AndroidManifest.xml">
+        <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    </config-file>
+    <resource-file src="res/xml/network_security_config.xml" target="app/src/main/res/xml/network_security_config.xml" />
+    <resource-file src="res/raw/appd_ca_bundle.pem" target="app/src/main/res/raw/appd_ca_bundle.pem" />
+    <resource-file src="res/values/strings.xml" target="app/src/main/res/values/strings.xml" />
+    <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">
+        <application android:networkSecurityConfig="@xml/network_security_config" android:usesCleartextTraffic="true" />
+    </edit-config>
+    <preference name="loglevel" value="DEBUG" />
+    <preference name="LoadUrlTimeoutValue" value="70000" />
+    <preference name="AndroidGradlePluginVersion" value="8.7.2" />
+</widget>
