@@ -216,27 +216,6 @@ var defaultCfg = {
 
 ---
 
-## 🚢 Pushing to Your GitHub Repository
-
-To publish this project to your personal or organization GitHub account:
-
-```bash
-# 1. Add your GitHub remote:
-git remote add origin https://github.com/AlaAlmarayat/alaa-appd-eum.git
-
-# 2. Stage all files:
-git add .
-
-# 3. Create initial commit:
-git commit -m "feat: initial commit of Ala'a AppD EUM Debugger & Session Replay Lab"
-
-# 4. Push to main:
-git branch -M main
-git push -u origin main
-```
-
----
-
 ## 🩺 Troubleshooting Guide
 
 ### 1. `{"command":"disable-agent"}` on Session Replay Uploads
